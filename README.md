@@ -1,92 +1,83 @@
 # Projeto Linux: Infraestrutura Web Segura e Automatizada na AWS
 
-Este repositório documenta a implementação de uma infraestrutura web segura, resiliente e com criação totalmente automatizada na AWS através de User Data. O projeto foi desenvolvido como parte do Programa de Bolsas DevSecOps da Compass UOL e abrange conceitos fundamentais de redes na nuvem, automação de servidores e monitoramento contínuo.
+Este repositório documenta a implementação de uma infraestrutura web segura, resiliente e totalmente automatizada na AWS. O projeto foi desenvolvido como parte do **Programa de Bolsas DevSecOps da Compass UOL** e demonstra habilidades fundamentais em Linux, redes na nuvem, automação e monitoramento.
 
 ## Visão Geral do Projeto
 
-O desafio consistia em provisionar o ambiente para uma nova aplicação web, garantindo alta disponibilidade e segurança. A solução final inclui uma rede VPC customizada com sub-redes públicas e privadas, um Bastion Host para acesso administrativo seguro, e um servidor web privado que se autoconfigura no lançamento via User Data. Adicionalmente, um script de monitoramento verifica a saúde do site a cada minuto e envia alertas para o Discord em caso de falha.
+O objetivo foi provisionar um ambiente de nuvem para uma nova aplicação web, garantindo alta disponibilidade e segurança. A solução final inclui uma rede VPC customizada com sub-redes públicas e privadas, um Bastion Host para acesso administrativo seguro, e um servidor web privado que se autoconfigura no lançamento via User Data. Adicionalmente, um script de monitoramento verifica a saúde do site a cada minuto e envia alertas para o Discord em caso de falha.
 
-## Arquitetura Final
+## Etapa 1: Configuração do Ambiente
 
-A arquitetura implementada segue boas práticas de segurança, minimizando a superfície de ataque ao isolar o servidor web do acesso direto pela internet.
+Nesta etapa, a infraestrutura de base na AWS foi provisionada para garantir um ambiente de rede seguro e isolado.
 
-- **VPC (Virtual Private Cloud):** Rede isolada com CIDR `10.0.0.0/16`.
-- **Sub-redes Públicas:** Hospedam recursos que precisam de acesso à internet, como o Bastion Host e o NAT Gateway.
-- **Sub-redes Privadas:** Hospedam o servidor web, protegendo-o de acessos externos não autorizados.
-- **Bastion Host (Jump Server):** Instância EC2 `t2.micro` na sub-rede pública, atuando como um ponto de entrada único e seguro para acesso administrativo (SSH).
-- **Servidor Web:** Instância EC2 `t2.micro` na sub-rede privada, configurada automaticamente com Nginx e o script de monitoramento.
-- **NAT Gateway:** Permite que o servidor web na sub-rede privada inicie conexões com a internet para baixar pacotes e atualizações.
+### 1.1. Criação da VPC (Virtual Private Cloud)
+Foi criada uma VPC customizada utilizando o assistente **"VPC e mais"**. A topologia de rede foi desenhada para separar os recursos de acesso público dos recursos privados, uma prática essencial de segurança.
 
-### Fluxo de Acesso
-- **Administrativo (SSH):** O acesso ao servidor web é feito em dois saltos, conectando-se primeiro ao Bastion Host e, a partir dele, ao servidor na rede privada.
-  **Exemplo de acesso ao servidor web:**
-  <img width="1033" height="770" alt="acesso ao bastion com agent forwarding" src="https://github.com/user-attachments/assets/ccda9c17-e6ef-48d3-a351-657617651548" />
+O mapa abaixo ilustra a arquitetura da rede após a criação.
 
-  <img width="700" height="566" alt="acesso ao servidor privado" src="https://github.com/user-attachments/assets/fe738e17-a718-4c13-9b2f-832aa4ffb546" />
+<img width="1588" height="441" alt="mapa de recursos vpc" src="https://github.com/user-attachments/assets/1789a29a-b5b5-46e8-9006-e64f75aa720d" />
+
+A Tabela de Rotas da sub-rede privada foi configurada para direcionar o tráfego de internet (`0.0.0.0/0`) através de um NAT Gateway.
+
+<img width="1626" height="337" alt="tabela de rotas subrede privada" src="https://github.com/user-attachments/assets/6433ac0d-ac31-4e1b-8510-02ec0ef6df99" />
+
+### 1.2. Criação da Instância EC2
+Foram criadas duas instâncias (`t2.micro` com Ubuntu), utilizando um único par de chaves para ambas. O Security Group do Servidor Web foi configurado para permitir acesso SSH apenas a partir do Bastion Host.
+
+<img width="1593" height="197" alt="regras de entrada servidor web privado" src="https://github.com/user-attachments/assets/ac138a54-530a-4ded-a2fd-63843241f4d3" />
+
+---
+
+## Etapa 2: Configuração do Servidor Web
+
+Com a infraestrutura de rede pronta, a instalação e configuração do servidor Nginx na instância privada foram totalmente automatizadas via **User Data**. O código completo pode ser encontrado no arquivo [user-data.txt](user-data.txt).
+
+<img width="820" height="514" alt="Automaçao User Data" src="https://github.com/user-attachments/assets/6741908f-34cd-48d6-9dcc-30617e4ccb57" />
+
+---
+
+## Etapa 3: Script de Monitoramento e Webhook
+
+Um script em Bash é executado a cada minuto para verificar a saúde do site, registrar logs e enviar alertas para o Discord em caso de falha. O código completo do script está no arquivo [monitor.sh](monitor.sh).
+
+---
+
+## Etapa 4: Testes e Documentação
+
+Esta seção detalha como validar toda a solução implementada.
+
+### 4.1. Como Testar a Implementação
+
+#### Acesso ao Ambiente
+O acesso administrativo ao servidor web privado é feito de forma segura através do Bastion Host, utilizando **SSH Agent Forwarding**. Para visualizar o site, que não possui IP público, um **Túnel SSH (Local Port Forwarding)** é utilizado.
+
+### **Conexão Administrativa:**
+
+<img width="1033" height="770" alt="acesso ao bastion com agent forwarding" src="https://github.com/user-attachments/assets/129de1ff-5e4d-4f13-a7b0-cea0aa58a68d" />
+
+### **Agora acessando o servidor privado a partir do Bastion**
 
 
-- **Público (HTTP):** O acesso ao site é feito através de um túnel SSH (`Local Port Forwarding`) para fins de teste e validação pelo desenvolvedor. Em um ambiente de produção, um Application Load Balancer seria adicionado.
-
-  <img width="1018" height="636" alt="segundo terminal para tunel ssh" src="https://github.com/user-attachments/assets/4e108d84-59b9-4d07-9230-2442bb674b06" />
 
 
-## Passo a Passo da Implementação
 
-### 1. Configuração da Rede (VPC)
-A base da infraestrutura foi criada usando o assistente **"VPC e mais"**.
-- Foram criadas 2 sub-redes públicas e 2 privadas.
-- Um **Internet Gateway** foi associado à tabela de rotas das sub-redes públicas.
-- Um **NAT Gateway** foi provisionado em uma sub-rede pública e associado à tabela de rotas das sub-redes privadas, com destino `0.0.0.0/0`.
+<img width="700" height="566" alt="acesso ao servidor privado" src="https://github.com/user-attachments/assets/f7cc2180-7a9e-4785-a90f-455df45fdf89" />
 
-### 2. Criação das Instâncias (EC2)
-Um único par de chaves (`chave-servidor-bastion.pem`) foi criado e utilizado para ambas as instâncias.
+### **Segundo terminal utilizado para fazer o Tunel SSH (Local Post Forwarding)**
 
-- **Bastion Host:**
-    - Lançado na **sub-rede pública** com um IP público habilitado.
-    - Seu Security Group permite tráfego de entrada na porta `22` (SSH) apenas do IP do administrador.
+<img width="1018" height="636" alt="segundo terminal para tunel ssh" src="https://github.com/user-attachments/assets/f734613d-878e-4edc-8054-0da310402f47" />
 
-- **Servidor Web Privado:**
-    - Lançado na **sub-rede privada** com IP público desabilitado.
-    - Seu Security Group permite tráfego de entrada na porta `22` (SSH) apenas do Bastion e na porta `80` (HTTP) de qualquer lugar.
-    - Foi utilizado um script completo no campo **User Data** para automatizar toda a configuração.
- 
+### **Visualização do Site Local que ficou disponível em localhost:8080**
   
-### 3. Automação com User Data
-O script de automação, executado no primeiro boot do servidor web, realiza as seguintes tarefas:
-1.  Atualiza os pacotes do sistema com `apt-get update/upgrade`.
-2.  Instala o Nginx.
-3.  Habilita e inicia o serviço Nginx.
-4.  Cria um arquivo de override no `systemd` para configurar o reinício automático do Nginx em caso de falha (`Restart=on-failure`).
-5.  Cria a página `index.html` personalizada em `/var/www/html/`.
-6.  Cria o script de monitoramento `monitor.sh` e o torna executável.
-7.  Cria o arquivo de log `/var/log/monitoramento.log` e atribui a permissão correta.
-8.  Adiciona uma tarefa no `crontab` do usuário `ubuntu` para executar o script de monitoramento a cada minuto.
+<img width="1919" height="1027" alt="Site localhost 80" src="https://github.com/user-attachments/assets/b67d0da1-5248-4b93-bb1a-bb9f4dfac429" />
 
-   <img width="820" height="514" alt="Automaçao User Data" src="https://github.com/user-attachments/assets/9007fee1-5cb9-4a4a-98c9-d59b0049ed7f" />
+## Teste do Sistema de Alertas
+Para simular uma falha, o serviço Nginx foi parado com `sudo systemctl stop nginx`.
 
+- **Logs de Monitoramento:**
 
-## Desafios e Soluções
+<img width="929" height="696" alt="monitoramento do site" src="https://github.com/user-attachments/assets/bf22f65c-7c8d-46e0-bb7f-95ac56805b39" />
 
-- **Conexão SSH:** O principal desafio foi estabelecer a conexão SSH, que apresentou erros de `Connection timed out` e `Permission denied (publickey)`.
-    - A solução para o `timeout` foi corrigir a regra de entrada do Security Group do Bastion para permitir o acesso a partir do IP público correto do administrador.
-    - A solução para a `permissão negada` foi garantir o uso de um par de chaves novo e consistente para ambas as instâncias e utilizar o **SSH Agent Forwarding (`-A`)** para "pular" do Bastion para o servidor privado.
-- **Falha na Automação:** A primeira versão do script de User Data falhou porque a instância na rede privada não conseguia acessar a internet para baixar pacotes. A solução foi a implementação do **NAT Gateway**.
+- **Alerta no Discord:**
 
-## Resultados dos Testes
-
-### Teste de Conexão e Acesso ao Site
-O acesso ao servidor web privado se dá através do Bastion Host. A visualização do site pode ser realizada por meio de um túnel SSH (`Local Port Forwarding`), confirmando que o Nginx foi instalado e configurado corretamente pela automação e o site está funcionando corretamente.
-
-**Ficou assim a visualização do site, acessado pelo http:localhost:8080**
-<img width="1919" height="1027" alt="Site localhost 80" src="https://github.com/user-attachments/assets/89f3faae-7900-48c7-bc7e-eb40397247cb" />
-
-
-
-- **Log do Servidor:** O comando `tail -f /var/log/monitoramento.log` mostrou o registro das verificações de status e a mudança para o estado de `[ALERTA]` quando o serviço foi interrompido.
-
-<img width="929" height="696" alt="monitoramento do site" src="https://github.com/user-attachments/assets/2ac5460e-c6e0-4e14-a44d-9e6400a29342" />
-
-- **Alerta no Discord:** As notificações de "OFFLINE" foram recebidas com sucesso no canal do Discord configurado via webhook, validando a funcionalidade do sistema de alerta.
-
-<img width="1097" height="498" alt="discord novo" src="https://github.com/user-attachments/assets/fb3ca14d-dfb6-4270-bdf5-9994fc848007" />
-
+<img width="1097" height="498" alt="discord novo" src="https://github.com/user-attachments/assets/adc45ad6-5809-4f74-aa37-47316c9fff60" />
