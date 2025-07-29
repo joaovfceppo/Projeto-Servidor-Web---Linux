@@ -1,0 +1,82 @@
+#!/bin/bash
+# Garante que o sistema de pacotes esteja pronto
+apt-get update -y
+apt-get upgrade -y
+
+# Instala o Nginx
+apt-get install -y nginx
+
+# Habilita e inicia o serviço do Nginx
+systemctl enable nginx
+systemctl start nginx
+
+# ETAPA 2: CONFIGURAÇÃO DO REINÍCIO AUTOMÁTICO (SYSTEMD)
+# Cria um arquivo de override para o serviço do Nginx
+mkdir -p /etc/systemd/system/nginx.service.d
+# Adiciona as diretivas de reinício automático
+cat <<EOF > /etc/systemd/system/nginx.service.d/override.conf
+[Service]
+Restart=on-failure
+RestartSec=5s
+EOF
+
+
+# Recarrega o systemd para aplicar a nova configuração
+systemctl daemon-reload
+systemctl restart nginx
+
+# Cria a página HTML
+cat <<EOF > /var/www/html/index.html
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Projeto Servidor com AWS</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #1a1a1a; color: #e0e0e0; text-align: center; margin-top: 80px; }
+        h1 { color: #00aeff; font-size: 2.5em; }
+        p { font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <h1>Projeto Linux - Infraestrutura Automatizada</h1>
+    <p>Este servidor Nginx foi configurado automaticamente via User Data.</p>
+</body>
+</html>
+EOF
+
+#  Criaçao do script de monitoramento monitor.sh
+# Cria o diretório de scripts e define o dono como o usuário 'ubuntu'
+mkdir -p /home/ubuntu/scripts
+chown -R ubuntu:ubuntu /home/ubuntu/scripts
+
+# Cria o arquivo de script monitor.sh
+cat <<EOF > /home/ubuntu/scripts/monitor.sh
+#!/bin/bash
+SITE_URL="http://localhost"
+LOG_FILE="/var/log/monitoramento.log"
+WEBHOOK_URL="usei meu webhook aqui"
+
+HTTP_STATUS=\$(curl -o /dev/null -s -w "%{http_code}" \$SITE_URL)
+DATA_ATUAL=\$(date +"%d/%m/%Y %H:%M:%S")
+
+if [ "\$HTTP_STATUS" -ne 200 ]; then
+    MENSAGEM="[ALERTA] O site \$SITE_URL está OFFLINE! Status: \$HTTP_STATUS"
+    echo "\$DATA_ATUAL - \$MENSAGEM" >> \$LOG_FILE
+    curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"\$MENSAGEM\"}" \$WEBHOOK_URL
+else
+    MENSAGEM="[INFO] O site \$SITE_URL está funcionando normalmente. Status: \$HTTP_STATUS"
+    echo "\$DATA_ATUAL - \$MENSAGEM" >> \$LOG_FILE
+fi
+EOF
+
+# Dá permissão de execução ao script
+chmod +x /home/ubuntu/scripts/monitor.sh
+
+# Configurando o Log e o Cron
+# Cria o arquivo de log e dá a permissão correta
+touch /var/log/monitoramento.log
+chown ubuntu:ubuntu /var/log/monitoramento.log
+
+# Adiciona a tarefa ao crontab do usuário 'ubuntu'
+(crontab -l -u ubuntu 2>/dev/null; echo "* * * * * /home/ubuntu/scripts/monitor.sh") | crontab - -u ubuntu
